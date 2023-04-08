@@ -6,7 +6,7 @@ def is_building_corner(left_color, right_color):
        return True, RIGHT
    if is_in_building_color(right_color) and not is_in_building_color(left_color):
        return True, LEFT
-   return False,
+   return False, False
 
 def is_in_building_color(color):
    print(color)
@@ -18,11 +18,12 @@ upper_color = np.array([241,232,226])
 lower_color = np.array([137,132,128])
 
 # Read image
-image = cv2.imread(r'C:\Users\amirs\Downloads\noCorner.jpeg')
-image= cv2.resize(image, None, fx=0.3, fy=0.3)
+#image = cv2.imread(r'C:\Users\amirs\Downloads\noCorner.jpeg')
+#image= cv2.resize(image, None, fx=0.3, fy=0.3)
 
 def find_building_corner(image, building_color):
-
+    upper_color=building_color+20
+    lower_color=building_color-20
 # Convert image to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 #gray = cv2.GaussianBlur(gray, (9,9), 0)
@@ -78,8 +79,9 @@ def find_building_corner(image, building_color):
             cv2.imshow('detectedLines.png', image)
             cv2.waitKey(0)
             return is_building_corner(left_color, right_color), x1, y1, x2, y2
+    return False,False,0,0,0,0
 
-   return false
+
 
 
 
