@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox
 import cv2
 import numpy as np
 import time
@@ -6,17 +7,21 @@ from PIL import Image, ImageTk
 from djitellopy import Tello
 from ultralytics import YOLO
 from corner import find_building_corner
+from window import get_direction
+from rectangle_detection import detect_rectangles
 WIDTH=720
 HEIGHT=960
 class ColorPicker:
     def __init__(self, master):
         self.master = master
-        self.canvas = tk.Canvas(master, width=720, height=480)
-        self.canvas.pack()
+        self.canvas = tk.Canvas(master, width=960, height=720)
+        self.canvas.place(x=20, y=20)
         self.canvas.bind("<Button-1>", self.get_color)
 
         self.cap = tello.get_frame_read()
         self.frame = self.cap.frame
+        self.results=[]
+        self.unmarked=self.frame
         self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
 
@@ -28,97 +33,151 @@ class ColorPicker:
 
 
 def update():
+    global ON
     picker.frame = picker.cap.frame
+    if ON:
+        results = model(picker.frame)
+        picker.unmarked=picker.frame
+        picker.frame = results[0].plot()
+        picker.results=results
+#         picker.unmarked=picker.frame
+#        picker.frame, picker.results = detect_rectangles(picker.frame)
+
     picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
 
 def handle_edge():
-    img = tello.get_frame_read().frame
     x1,y1,x2,y2= WIDTH,HEIGHT,WIDTH,HEIGHT
     is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
     while x1 >= WIDTH//2 or x2>= WIDTH//2:
         tello.move_right(step)
-        img = tello.get_frame_read().frame
+        img = picker.unmarked
         is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
     tello.move_right(7*step)
-    img = tello.get_frame_read().frame
+    img = picker.unmarked
     tello.rotate_counter_clockwise(90)
     is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
     while(not is_edge or direction!= LEFT):
          tello.move_right(step)
-         img = tello.get_frame_read().frame
+         img = picker.unmarked
          is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
     return
 
 def find_window():
-    if(ON):
-        try:
-           while True:
-               img = picker.frame
-               img = model(img)
-               if(len(img[0].boxes)): #found window
-                    plotted=img[0].plot()
-                    cv2.imshow('frame', plotted)
-                    cv2.waitKey(1)
-                    return img[0]
-               else:
-                    results= find_building_corner(img, BUILDING_COLOR)
-                    if(results[0] and results[1]==RIGHT):
-                        handle_edge()
-                        break
-                    else:
-                        tello.move_right(20)
-                        break
-        except KeyboardInterrupt:
-           tello.streamoff()
-           tello.land()
-           tello.disconnect()
-           exit(1)
-    else:
-        return[]
+    global ON
+    print("trying to find")
+    if not ON:
+          root.after(1000, find_window)
+          return[]
+    try:
+        while True:
+            if(len(picker.results[0].boxes)): #found window, syntax of model
+                print("detected window")
+            #   return picker.results[0].boxes[0]
+                root.after(1000, enter_window)
+                return picker.results[0].boxes[0]
+            else :
+                tello.move_right(step)
+                print("moving right")
+#             else:
+#                results= find_building_corner(picker.unmarked, BUILDING_COLOR)
+#                if(results[0] and results[1]==RIGHT):
+#                     handle_edge()
+#                     break
+#                else:
+#                     tello.move_right(20)
+#                     break
+    except KeyboardInterrupt:
+        tello.streamoff()
+        tello.land()
+        exit(1)
+
+
+def ask_for_confirmation(x1,y1,x2,y2):
+    original_image = Image.fromarray(picker.frame)
+    dialog_box = tk.Toplevel()
+    canvas = tk.Canvas(dialog_box, width=580, height=360)
+    pad=10
+    crop_region = (x1-pad, y1-pad, x2+pad, y2+pad)
+
+    cropped = original_image.crop(crop_region)
+
+
+# Create a canvas widget to display the image
+    canvas = tk.Canvas(dialog_box, width=cropped.width, height=cropped.height)
+    canvas.pack()
+
+# Convert the cropped image to a Tkinter PhotoImage
+    tk_image = ImageTk.PhotoImage(cropped)
+
+# Add the image to the canvas
+    canvas.create_image(0, 0, anchor="nw", image=tk_image)
+    label=tk.Label(dialog_box, text="Enter marked window?")
+    label.pack()
+    # Create a function to handle the user's button click
+    def on_button_click():
+        # If the user clicks the "Yes" button, do something
+        # ...
+        dialog_box.destroy() # Close the dialog box
+
+    # Create a "Yes" button using a Tkinter Button widget
+    yes_button = up_button = tk.Button(dialog_box,activebackground="#d9d9d9",  image=accept_img, borderwidth=0,command=on_button_click)
+    yes_button.pack(side="left", padx=10, pady=10)
+
+    # Create a "No" button using a Tkinter Button widget
+    no_button = tk.Button(dialog_box,activebackground="#d9d9d9",  image=reject_img, borderwidth=0,command=dialog_box.destroy)
+    no_button.pack(side="right", padx=10, pady=10)
+
+    # Run the Tkinter event loop to display the dialog box and wait for user input
+    dialog_box.mainloop()
+    #dialog_box.after(1000, ask_for_confirmation)
+
 
 def enter_window():
+#     global ON
+#     if not ON: return
     direction=False
-    while direction!=CENTER:
+    while direction!="CENTER":
         #move to direction
-        img = picker.frame
-        img = model(img)
-        if(len(img[0].boxes)): #found window
-            direction=get_direction(img[0].boxes.xyxy)
-    while len(img[0].boxes)!=0 and direction==CENTER:
+        if(len(picker.results[0].boxes)): #found window
+            print("saw window in enter")
+            direction=get_direction(picker.results[0].boxes.xyxy)
+            print(direction)
+        else:
+            print("couldnt see, trying to search")
+            root.after(1000, find_window)
+            return
+    while picker.results[0].boxes!=0 and direction=="CENTER":
         tello.move_forward(step)
-        img = picker.frame
-        img = model(img)
-        if(len(img[0].boxes)): #found window
-            direction=get_direction(img[0].boxes.xyxy)
+        if(len(picker.results[0].boxes)): #found window
+            direction=get_direction(picker.results[0].boxes.xyxy)
+            print(direction)
 
-    tello.move_forward(3*step)
-    tello.land()
+#     tello.move_forward(3*step)
+#     tello.land()
 
+def engine():
+    ask_for_confirmation(100,100,200,200)
+#     global ON
+#     if ON:
+#         tello.land()
+#         ON=False
+#     else:
+#         tello.takeoff()
+#         tello.move_up(100)
+#         ON=True
 
-
+#create a Tello object to control the drone
 step=20
 ON=False
 BUILDING_COLOR=[0,0,0]
 model = YOLO("window_detector.pt")
-def engine():
-    if ON:
-        tello.land()
-        tello.streamoff()
-        tello.disconnect()
-        ON=False
-    else:
-        tello.takeoff()
-        ON=True
-
-# create a Tello object to control the drone
+tello = Tello()
 #
-# tello = Tello()
-# #
-# # # set up the video stream from the Tello drone
-# tello.connect()
-# tello.streamon()
+# # set up the video stream from the Tello drone
+tello.connect()
+tello.streamon()
 
 # set up the GUI
 root = tk.Tk()
@@ -126,59 +185,51 @@ root.title("Tello Control GUI")
 root.geometry("1000x1000")
 
 
-# picker = ColorPicker(root)
-# picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=picker.photo)
-# root.after(10, update)
-#
+picker = ColorPicker(root)
+picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=picker.photo)
+root.after(10, update)
+
 
 click_btn= tk.PhotoImage(file="buttons/left.png")
-forward_img=tk.PhotoImage(file="buttons/up.png")
-back_img=tk.PhotoImage(file="buttons/down.png")
+forward_img=tk.PhotoImage(file="buttons/forward.png")
+back_img=tk.PhotoImage(file="buttons/back.png")
 left_img=tk.PhotoImage(file="buttons/left.png")
 right_img=tk.PhotoImage(file="buttons/right.png")
 engine_img=tk.PhotoImage(file="buttons/engine.png")
 clock_img=tk.PhotoImage(file="buttons/clockwise.png")
-counterClock_img=tk.PhotoImage(file="buttons/counterClockwise.png")
-up_img=tk.PhotoImage(file="buttons/plus.png")
-down_img=tk.PhotoImage(file="buttons/minus.png")
-left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0, command=lambda: tello.send_rc_control(-step, 0, 0, 0))
-left_button.place(x=200, y=740)
-right_button = tk.Button(root, activebackground="#d9d9d9", image=right_img, borderwidth=0,command=lambda: tello.send_rc_control(step, 0, 0, 0))
-right_button.place(x=320, y=740)
-up_button = tk.Button(root,activebackground="#d9d9d9",  image=up_img, borderwidth=0,command=lambda: tello.send_rc_control(0, step, 0, 0))
-up_button.place(x=500, y=650)
-down_button = tk.Button(root, activebackground="#d9d9d9", image=down_img, borderwidth=0,command=lambda: tello.send_rc_control(0, -step, 0, 0))
-down_button.place(x=500, y=750)
-forward_button = tk.Button(root, activebackground="#d9d9d9", image=forward_img, borderwidth=0,command=lambda: tello.send_rc_control(0, 0, step, 0))
-forward_button.place(x=260, y=680)
-back_button = tk.Button(root, activebackground="#d9d9d9", image=back_img, borderwidth=0, command=lambda: tello.send_rc_control(0, 0, -step, 0))
-back_button.place(x=260, y=800)
+counterClock_img=tk.PhotoImage(file="buttons/counter.png")
+up_img=tk.PhotoImage(file="buttons/up.png")
+down_img=tk.PhotoImage(file="buttons/down.png")
+reject_img=tk.PhotoImage(file="buttons/reject.png")
+accept_img=tk.PhotoImage(file="buttons/accept.png")
+
+left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0, command=lambda: tello.move_left(step))
+left_button.place(x=200, y=830)
+right_button = tk.Button(root, activebackground="#d9d9d9", image=right_img, borderwidth=0,command=lambda: tello.move_right(step))
+right_button.place(x=320, y=830)
+forward_button = tk.Button(root, activebackground="#d9d9d9", image=forward_img, borderwidth=0,command=lambda: tello.move_forward(step))
+forward_button.place(x=260, y=770)
+back_button = tk.Button(root, activebackground="#d9d9d9", image=back_img, borderwidth=0, command=lambda: tello.move_back(step))
+back_button.place(x=260, y=890)
+
+up_button = tk.Button(root,activebackground="#d9d9d9",  image=up_img, borderwidth=0,command=lambda: tello.move_up(step))
+up_button.place(x=650, y=770)
+down_button = tk.Button(root, activebackground="#d9d9d9", image=down_img, borderwidth=0,command=lambda: tello.move_down(step))
+down_button.place(x=650, y=890)
+label=tk.Label(root, text="ADJUST HEIGHT")
+label.place(x=650, y=850)
+
 land_button = tk.Button(root, activebackground="#d9d9d9", image=engine_img, borderwidth=0, command=engine )
-land_button.place(x=40, y=750)
+land_button.place(x=400, y=750)
+
 clock_button = tk.Button(root, activebackground="#d9d9d9", image=clock_img, borderwidth=0,command=lambda: tello.rotate_clockwise(30))
-clock_button.place(x=400, y=680)
+clock_button.place(x=840, y=770)
 counterclock_button = tk.Button(root, activebackground="#d9d9d9", image=counterClock_img, borderwidth=0, command=lambda:  tello.rotate_counter_clockwise(30))
-counterclock_button.place(x=400, y=800)
-
-# create an entry box for the command
-# command_entry = tk.Entry(root, width=50)
-# command_entry.place(x=10, y=10)
-
-# create a canvas to display the video stream
-# canvas = tk.Canvas(root, width=640, height=480)
-# canvas.place(x=300, y=10)
+counterclock_button.place(x=60, y=770)
 
 
-# find_window()
-# # ask_for_confirmation()
-# enter_window()
+#find_window()
+#ask_for_confirmation()
+#enter_window()
 
 root.mainloop()
-
-# function to execute the command entered by the user
-def execute_command():
-    command = command_entry.get()
-    if command.lower() == "enter":
-        enter_window() # assuming you have a function that controls the drone to enter the window
-    else:
-        tello.send_command(command)

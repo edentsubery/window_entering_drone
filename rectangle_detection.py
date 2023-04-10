@@ -40,10 +40,11 @@ import numpy as np
 def detect_rectangles(image):
 
     # grayscale, median blur, sharpen image
-    image = cv2.imread('facade (copy).jpg')
-    image= cv2.resize(image, None, fx=0.5, fy=0.5)
+    #image = cv2.imread('facade (copy).jpg')
+    #image= cv2.resize(image, None, fx=0.5, fy=0.5)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur= cv2.bilateralFilter(gray,9, 100, 100)
+    #blur= cv2.bilateralFilter(gray,9, 100, 100)
+    blur=cv2.GaussianBlur(gray,(5,5),0)
     sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
     sharpen = cv2.filter2D(blur, -1, sharpen_kernel)
 
@@ -69,7 +70,7 @@ def detect_rectangles(image):
             cv2.rectangle(image, (x, y), (x + w, y + h), (36,255,12), 2)
             image_number += 1
             returned.append([x,y,x+w,y+h])
-    return returned
+    return image, returned
 #     cv2.imwrite('sharpen.jpg', sharpen)
 #     cv2.imwrite('open.jpg', open)
 #     cv2.imwrite('thresh.jpg', thresh)
