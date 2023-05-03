@@ -20,7 +20,7 @@ HEIGHT=960
 # tello.move_up(100)
 #
 # time.sleep(2)
-model = YOLO("/home/eden/Downloads/window_detector.pt")
+model = YOLO("window_detector.pt")
 back=True
 
 
