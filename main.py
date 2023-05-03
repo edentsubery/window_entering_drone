@@ -45,7 +45,7 @@ def expand_colors(rgb):
 
     # Compute dark color (20% darker)
     dark_l = max(0, l - 0.2)
-    dark_r, dark_g, dark_b = colorsys.hls_to_rgb(h, shade_l, s)
+    dark_r, dark_g, dark_b = colorsys.hls_to_rgb(h, dark_l, s)
     dark_color = (int(dark_r * 255), int(dark_g * 255), int(dark_b * 255))
 
     # Compute direct light color (20% brighter)
