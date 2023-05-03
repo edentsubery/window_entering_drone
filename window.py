@@ -30,6 +30,41 @@ back=True
 # print(len(results[0].boxes))
 # res_plotted = results[0].plot()
 
+import cv2
+
+def fly_through_window(img, window_bbox, drone):
+    # Get the coordinates of the window bounding box
+    window_x1, window_y1, window_x2, window_y2 = window_bbox
+
+    # Get the size of the image
+    height, width = img.shape[:2]
+
+    # Calculate the center point of the window
+    window_center_x = (window_x1 + window_x2) / 2
+    window_center_y = (window_y1 + window_y2) / 2
+
+    # Calculate the difference between the window center and the camera center
+    camera_center_x = width / 2
+    camera_center_y = height / 2
+    diff_x = window_center_x - camera_center_x
+    diff_y = window_center_y - camera_center_y
+
+    # Adjust the drone's yaw to center it with respect to the window
+    # Here's a simple example using proportional control to adjust the drone's yaw
+    k_p_yaw = 0.1
+    yaw_speed = k_p_yaw * diff_x
+    drone.set_yaw_speed(yaw_speed)
+
+    # Adjust the drone's height to center it with respect to the window
+    # Here's a simple example using proportional control to adjust the drone's height
+    k_p_height = 0.1
+    height_speed = k_p_height * diff_y
+    drone.set_height(height_speed)
+
+    # Move the drone forward to enter the window
+    # Here's a simple example using a fixed forward speed
+    forward_speed = 0.5
+    drone.set_forward_speed(forward_speed)
 
 
 def get_direction(window_bbox):
