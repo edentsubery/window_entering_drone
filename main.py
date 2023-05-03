@@ -186,15 +186,15 @@ def enter_window():
 #     tello.land()
 
 def engine():
-    ask_for_confirmation(100,100,200,200)
-#     global ON
-#     if ON:
-#         tello.land()
-#         ON=False
-#     else:
-#         tello.takeoff()
-#         tello.move_up(100)
-#         ON=True
+    #ask_for_confirmation(100,100,200,200)
+    global ON
+    if ON:
+        tello.land()
+        ON=False
+    else:
+        tello.takeoff()
+        tello.move_up(100)
+        ON=True
 
 #create a Tello object to control the drone
 step=20
