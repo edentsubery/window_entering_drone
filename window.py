@@ -32,20 +32,17 @@ back=True
 
 import cv2
 
-def fly_through_window(img, window_bbox, drone):
+def fly_through_window(window_bbox, drone):
     # Get the coordinates of the window bounding box
     window_x1, window_y1, window_x2, window_y2 = window_bbox
-
-    # Get the size of the image
-    height, width = img.shape[:2]
 
     # Calculate the center point of the window
     window_center_x = (window_x1 + window_x2) / 2
     window_center_y = (window_y1 + window_y2) / 2
 
     # Calculate the difference between the window center and the camera center
-    camera_center_x = width / 2
-    camera_center_y = height / 2
+    camera_center_x = WIDTH / 2
+    camera_center_y = HEIGHT / 2
     diff_x = window_center_x - camera_center_x
     diff_y = window_center_y - camera_center_y
 
