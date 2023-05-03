@@ -3,14 +3,20 @@ from tkinter import messagebox
 import cv2
 import numpy as np
 import time
+import colorsys
 from PIL import Image, ImageTk
 from djitellopy import Tello
 from ultralytics import YOLO
 from corner import find_building_corner
 from window import get_direction
 from rectangle_detection import detect_rectangles
+
 WIDTH=720
 HEIGHT=960
+BUILDING_COLOR=[0,0,0]
+LIGHT_COLOR=[0,0,0]
+DARK_COLOR=[0,0,0]
+
 class ColorPicker:
     def __init__(self, master):
         self.master = master
@@ -28,9 +34,31 @@ class ColorPicker:
     def get_color(self, event):
         x, y = event.x, event.y
         rgb = self.frame[y, x]
-        BUILDING_COLOR=rgb
-        print("RGB:", rgb)
+        expand_colors(rgb)
 
+
+def expand_colors(rgb):
+    global BUILDING_COLOR, LIGHT_COLOR, DARK_COLOR
+    r,b,g=rgb
+    # Convert RGB to HSL
+    h, l, s = colorsys.rgb_to_hls(r/255, g/255, b/255)
+
+    # Compute dark color (20% darker)
+    dark_l = max(0, l - 0.2)
+    dark_r, dark_g, dark_b = colorsys.hls_to_rgb(h, shade_l, s)
+    dark_color = (int(dark_r * 255), int(dark_g * 255), int(dark_b * 255))
+
+    # Compute direct light color (20% brighter)
+    light_l = min(1, l + 0.2)
+    light_r, light_g, light_b = colorsys.hls_to_rgb(h, light_l, s)
+    light_color = (int(light_r * 255), int(light_g * 255), int(light_b * 255))
+
+    print(f"RGB color: ({r}, {g}, {b})")
+    print(f"Shade color: {dark_color}")
+    print(f"Direct light color: {light_color}")
+    BUILDING_COLOR=rgb
+    LIGHT_COLOR=light_color
+    DARK_COLOR=dark_color
 
 def update():
     global ON
@@ -171,7 +199,6 @@ def engine():
 #create a Tello object to control the drone
 step=20
 ON=False
-BUILDING_COLOR=[0,0,0]
 model = YOLO("window_detector.pt")
 tello = Tello()
 #
