@@ -1,16 +1,10 @@
 import tkinter as tk
-from tkinter import messagebox
-import cv2
-import numpy as np
-import time
 import colorsys
 from PIL import Image, ImageTk
 from djitellopy import Tello
 from ultralytics import YOLO
-from corner import find_building_corner
 from window import get_direction
 from window import fly_through_window
-from rectangle_detection import detect_rectangles
 
 WIDTH = 720
 HEIGHT = 960
@@ -65,6 +59,7 @@ def expand_colors(rgb):
 
 def update():
     global ON
+    global is_enter_running
     picker.frame = picker.cap.frame
     if ON:
         results = model(picker.frame)
@@ -72,32 +67,15 @@ def update():
         picker.frame = results[0].plot()
         picker.results = results
         if len(picker.results[0].boxes)!=0:
-            enter_window(results)
-
-    #         picker.unmarked=picker.frame
-    #        picker.frame, picker.results = detect_rectangles(picker.frame)
+            if not is_enter_running:
+                enter_window_thread = threading.Thread(target=enter_window, args=(results,))
+                enter_window_thread.start()
+                is_enter_running = True
 
     picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
 
-
-# def handle_edge():
-#     x1,y1,x2,y2= WIDTH,HEIGHT,WIDTH,HEIGHT
-#     is_edge,direction, x1,y1,x2,y2= find_building_corner(image, BUILDING_COLOR)
-#     while x1 >= WIDTH//2 or x2>= WIDTH//2:
-#         tello.move_right(step)
-#         img = picker.unmarked
-#         is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
-#     tello.move_right(7*step)
-#     img = picker.unmarked
-#     tello.rotate_counter_clockwise(90)
-#     is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
-#     while(not is_edge or direction!= 'LEFT'):
-#          tello.move_right(step)
-#          img = picker.unmarked
-#          is_edge,direction, x1,y1,x2,y2= find_building_corner(img, BUILDING_COLOR)
-#     return
 
 def find_window():
     global ON
@@ -235,15 +213,8 @@ def enter_window(results):
         print("couldnt see, trying to search")
             #root.after(1000, find_window)
         return
-#     while picker.results[0].boxes != 0 and direction == "CENTER":
-#         tello.move_forward(step)
-#         if (len(picker.results[0].boxes)):  # found window
-#             direction = get_direction(picker.results[0].boxes.xyxy)
-#             print(direction)
-#
 
-#     tello.move_forward(3*step)
-#     tello.land()
+import threading
 
 def engine():
     # ask_for_confirmation(100,100,200,200)
@@ -254,17 +225,16 @@ def engine():
         ON = False
     else:
         tello.takeoff()
-        #tello.move_up(100)
         ON = True
         print (ON)
 
         print("calling engine")
-        #root.after(1000, find_window())
 
 
 # create a Tello object to control the drone
 step = 20
 ON = False
+is_enter_running = False;
 model = YOLO("window_detector.pt")
 tello = Tello()
 #
@@ -327,8 +297,5 @@ counterclock_button = tk.Button(root, activebackground="#d9d9d9", image=counterC
                                 command=lambda: tello.rotate_counter_clockwise(30))
 counterclock_button.place(x=60, y=770)
 
-# find_window()
-# ask_for_confirmation()
-# enter_window()
 
 root.mainloop()
