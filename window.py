@@ -23,13 +23,6 @@ HEIGHT=960
 model = YOLO("window_detector.pt")
 back=True
 
-
-# results = model("facade (copy).jpg")
-# window_bbox=results[0].boxes.xyxy[1]
-#
-# print(len(results[0].boxes))
-# res_plotted = results[0].plot()
-
 import cv2
 
 def fly_through_window(window_bbox, drone):
@@ -66,10 +59,11 @@ def fly_through_window(window_bbox, drone):
 
 
 def get_direction(window_bbox):
+    print("window bbox " , window_bbox)
     direction = "UNKNOWN"
     # get the center coordinates of the window bbox
-    x_center = (window_bbox[0,0] + window_bbox[0,2]) // 2
-    y_center = (window_bbox[0,1] + window_bbox[0,3]) // 2
+    x_center = (window_bbox[0] + window_bbox[2]) // 2
+    y_center = (window_bbox[1] + window_bbox[3]) // 2
 
     # calculate the distance of the center of the window from the center of the image
     x_distance = x_center - (WIDTH // 2)
@@ -89,15 +83,28 @@ def get_direction(window_bbox):
     # determine the direction in which the drone needs to move based on the grid section
     if x_section == 1 and y_section == 1:
         direction = "CENTER"
-    elif x_section == 1 and y_section == 0:
-        direction = "UP"
-    elif x_section == 0:
+        return direction
+    if x_section == 0:
         direction = "LEFT"
-    elif x_section == 2:
+        return direction
+    if x_section == 2:
         direction = "RIGHT"
-    elif x_section == 1 and y_section == 2:
+        return direction
+    if y_section == 0:
+        direction = "UP"
+        return direction
+    if y_section == 2:
         direction = "DOWN"
-
+        return direction
+#     elif x_section == 1 and y_section == 0:
+#         direction = "UP"
+#     elif x_section == 0:
+#         direction = "LEFT"
+#     elif x_section == 2:
+#         direction = "RIGHT"
+#     elif x_section == 1 and y_section == 2:
+#         direction = "DOWN"
+    print(direction)
     return direction
 
 
@@ -171,3 +178,12 @@ upper = np.array([150, 150, 150])
 #    print("fin")
 #
 #
+
+
+results = model("facade (copy).jpg")
+window_bbox=results[0].boxes.xyxy[1]
+#
+print(len(results[0].boxes))
+res_plotted = results[0].plot()
+print(get_direction(window_bbox))
+

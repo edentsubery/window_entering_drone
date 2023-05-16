@@ -71,6 +71,9 @@ def update():
         picker.unmarked = picker.frame
         picker.frame = results[0].plot()
         picker.results = results
+        if len(picker.results[0].boxes)!=0:
+            enter_window(results)
+
     #         picker.unmarked=picker.frame
     #        picker.frame, picker.results = detect_rectangles(picker.frame)
 
@@ -105,7 +108,7 @@ def find_window():
         return []
 
     try:
-        while True:
+        #while True:
             print("searching,no results yet")
             if (picker.results and len(picker.results[0].boxes)):  # found window, syntax of model
                 print("detected window")
@@ -113,7 +116,10 @@ def find_window():
                 root.after(1000, enter_window)
                 #    root.after(1000, fly_in())
                 return picker.results[0].boxes[0]
-            time.sleep(1)
+            else:
+                root.after(1000, find_window)
+                return
+        #    time.sleep(1)
 
 #             else:
 #                results= find_building_corner(picker.unmarked, BUILDING_COLOR)
@@ -180,38 +186,61 @@ def fly_in():
 
 def get_tello_command(direction):
     # Define a dictionary that maps directions to Tello commands
-    commands = {'UP': 'up 20', 'DOWN': 'down 20', 'LEFT': 'left 20', 'RIGHT': 'right 20', 'CENTER': 'forward 1',
+    commands = {'UP': 'up 20', 'DOWN': 'down 20', 'LEFT': 'left 20', 'RIGHT': 'right 20', 'CENTER': 'forward 20',
                 'backward': 'back 20'}
 
     # Check if the direction is in the dictionary
     if direction in commands:
+        tello.send_control_command(commands[direction])
+        #tello.send_
         return commands[direction]
     else:
         return
 
+def move_in_direction(direction):
+    if direction=="UNKNOWN":
+        return
+    if direction=="UP":
+        tello.move_up(step)
+        return
+    if direction=="DOWN":
+        tello.move_down(step)
+        return
+    if direction=="RIGHT":
+        tello.move_right(step)
+        return
+    if direction=="LEFT":
+        tello.move_left(step)
+        return
+    if direction=="CENTER":
+        tello.move_forward(step)
+        return
 
-def enter_window():
+def enter_window(results):
     #     global ON
     #     if not ON: return
     direction = False
-    while direction != "CENTER":
+    #while direction != "CENTER":
         # move to direction
-        if (len(picker.results[0].boxes)):  # found window
-            print("saw window in enter")
-            print(picker.results[0].boxes.xyxy)
-            direction = get_direction(picker.results[0].boxes.xyxy)
-            print(direction)
-            tello.land()
-        else:
-            print("couldnt see, trying to search")
-            root.after(1000, find_window)
-            return
-    while picker.results[0].boxes != 0 and direction == "CENTER":
-        tello.move_forward(step)
-        if (len(picker.results[0].boxes)):  # found window
-            direction = get_direction(picker.results[0].boxes.xyxy)
-            print(direction)
-
+    if (len(picker.results[0].boxes)):  # found window
+        print("saw window in enter")
+        print(picker.results[0].boxes.xyxy)
+        direction = get_direction(picker.results[0].boxes.xyxy[0])
+        print(direction)
+        get_tello_command(direction)
+        print(direction)
+        return
+#             tello.land()
+    else:
+        print("couldnt see, trying to search")
+            #root.after(1000, find_window)
+        return
+#     while picker.results[0].boxes != 0 and direction == "CENTER":
+#         tello.move_forward(step)
+#         if (len(picker.results[0].boxes)):  # found window
+#             direction = get_direction(picker.results[0].boxes.xyxy)
+#             print(direction)
+#
 
 #     tello.move_forward(3*step)
 #     tello.land()
@@ -225,12 +254,12 @@ def engine():
         ON = False
     else:
         tello.takeoff()
-        tello.move_up(100)
+        #tello.move_up(100)
         ON = True
         print (ON)
 
         print("calling engine")
-        root.after(1000, find_window())
+        #root.after(1000, find_window())
 
 
 # create a Tello object to control the drone
