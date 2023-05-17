@@ -68,7 +68,7 @@ def update():
         picker.results = results
         if len(picker.results[0].boxes)!=0:
             if not is_enter_running:
-                enter_window_thread = threading.Thread(target=enter_window, args=(results,))
+                enter_window_thread = threading.Thread(target=enter_window, args=(results,tello))
                 enter_window_thread.start()
                 is_enter_running = True
 
@@ -162,15 +162,16 @@ def fly_in():
     fly_through_window(picker.results[0].boxes.xyxy)
 
 
-def get_tello_command(direction):
+def get_tello_command(direction, inner_tello):
     # Define a dictionary that maps directions to Tello commands
     commands = {'UP': 'up 20', 'DOWN': 'down 20', 'LEFT': 'left 20', 'RIGHT': 'right 20', 'CENTER': 'forward 20',
                 'backward': 'back 20'}
 
     # Check if the direction is in the dictionary
     if direction in commands:
-        tello.send_control_command(commands[direction])
-        #tello.send_
+        print("in tello_command, sending command: ", commands[direction])
+        inner_tello.send_control_command(commands[direction])
+        print("sent")
         return commands[direction]
     else:
         return
@@ -194,7 +195,7 @@ def move_in_direction(direction):
         tello.move_forward(step)
         return
 
-def enter_window(results):
+def enter_window(results, tello):
     #     global ON
     #     if not ON: return
     direction = False
@@ -202,11 +203,11 @@ def enter_window(results):
         # move to direction
     if (len(picker.results[0].boxes)):  # found window
         print("saw window in enter")
-        print(picker.results[0].boxes.xyxy)
+        print("window is at: ", picker.results[0].boxes.xyxy)
         direction = get_direction(picker.results[0].boxes.xyxy[0])
-        print(direction)
-        get_tello_command(direction)
-        print(direction)
+        print("in enter_window, sending:", direction, " suitable command----->")
+        get_tello_command(direction, tello)
+        print("done with sending command to move: ", direction)
         return
 #             tello.land()
     else:
