@@ -1,3 +1,4 @@
+import time
 import tkinter as tk
 import colorsys
 from PIL import Image, ImageTk
@@ -5,13 +6,14 @@ from djitellopy import Tello
 from ultralytics import YOLO
 from window import get_direction
 from window import fly_through_window
+import cv2
+import threading
 
 WIDTH = 720
 HEIGHT = 960
 BUILDING_COLOR = [0, 0, 0]
 LIGHT_COLOR = [0, 0, 0]
 DARK_COLOR = [0, 0, 0]
-
 
 class ColorPicker:
     def __init__(self, master):
@@ -64,17 +66,19 @@ def update():
     if ON:
         results = model(picker.frame)
         picker.unmarked = picker.frame
-        picker.frame = results[0].plot()
-        picker.results = results
-        if len(picker.results[0].boxes)!=0:
-            if not is_enter_running:
-                enter_window_thread = threading.Thread(target=enter_window, args=(results,tello))
-                enter_window_thread.start()
-                is_enter_running = True
+        if results:
+            picker.frame = results[0].plot()
+            picker.results = results
+            if len(picker.results[0].boxes) != 0:
+                if not is_enter_running:
+                    enter_window_thread = threading.Thread(target=enter_window, args=(results, tello))
+                    enter_window_thread.start()
+                    is_enter_running = True
 
     picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
+
 
 
 def find_window():
@@ -109,7 +113,6 @@ def find_window():
 #                     break
     except KeyboardInterrupt:
         root.destroy()
-
         tello.streamoff()
         tello.land()
         tello.end()
@@ -176,6 +179,7 @@ def get_tello_command(direction, inner_tello):
     else:
         return
 
+
 def move_in_direction(direction):
     if direction=="UNKNOWN":
         return
@@ -195,12 +199,13 @@ def move_in_direction(direction):
         tello.move_forward(step)
         return
 
-def enter_window(results, tello):
+
+def enter_window(results, inner_tello):
     #     global ON
     #     if not ON: return
     direction = False
-    #while direction != "CENTER":
-        # move to direction
+    # while direction != "CENTER":
+    # move to direction
     if (len(picker.results[0].boxes)):  # found window
         print("saw window in enter")
         print("window is at: ", picker.results[0].boxes.xyxy)
@@ -208,14 +213,13 @@ def enter_window(results, tello):
         print("in enter_window, sending:", direction, " suitable command----->")
         get_tello_command(direction, tello)
         print("done with sending command to move: ", direction)
-        return
-#             tello.land()
+        #return
+        tello.land()
     else:
         print("couldnt see, trying to search")
-            #root.after(1000, find_window)
+        # root.after(1000, find_window)
         return
 
-import threading
 
 def engine():
     # ask_for_confirmation(100,100,200,200)
@@ -225,7 +229,7 @@ def engine():
         tello.land()
         ON = False
     else:
-        tello.takeoff()
+        #tello.takeoff()
         ON = True
         print (ON)
 
@@ -247,7 +251,7 @@ tello.streamon()
 # set up the GUI
 root = tk.Tk()
 root.title("Tello Control GUI")
-root.geometry("1000x1000")
+root.geometry("800x800")
 
 picker = ColorPicker(root)
 picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=picker.photo)
@@ -266,24 +270,56 @@ down_img = tk.PhotoImage(file="buttons/down.png")
 reject_img = tk.PhotoImage(file="buttons/reject.png")
 accept_img = tk.PhotoImage(file="buttons/accept.png")
 
+
+def move_left():
+    tello.send_control_command('command')  # Put the drone in command mode
+    tello.move_left(step)  # Move left
+    time.sleep(5)  # Wait for 5 seconds
+
+def move_right():
+    tello.send_control_command('command')  # Put the drone in command mode
+    tello.move_right(step)  # Move right
+    time.sleep(5)  # Wait for 5 seconds
+
+def move_up():
+    tello.send_control_command('command')  # Put the drone in command mode
+    tello.move_up(step)  # Move up
+    print("up from botton")
+    time.sleep(5)  # Wait for 5 seconds
+
+def move_down():
+    tello.send_control_command('command')  # Put the drone in command mode
+    tello.move_down(step)  # Move down
+    time.sleep(5)  # Wait for 5 seconds
+
+def move_forward():
+    tello.send_control_command('command')  # Put the drone in command mode
+    tello.move_forward(step)  # Move forward
+    time.sleep(5)  # Wait for 5 seconds
+
+def move_back():
+    tello.send_control_command('command')  # Put the drone in command mode
+    tello.move_back(step)  # Move back
+    time.sleep(5)  # Wait for 5 seconds
+
 left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0,
-                        command=lambda: tello.move_left(step))
+                        command=lambda: move_left())
 left_button.place(x=200, y=830)
 right_button = tk.Button(root, activebackground="#d9d9d9", image=right_img, borderwidth=0,
-                         command=lambda: tello.move_right(step))
+                         command=lambda: move_right())
 right_button.place(x=320, y=830)
 forward_button = tk.Button(root, activebackground="#d9d9d9", image=forward_img, borderwidth=0,
-                           command=lambda: tello.move_forward(step))
+                           command=lambda: move_forward())
 forward_button.place(x=260, y=770)
 back_button = tk.Button(root, activebackground="#d9d9d9", image=back_img, borderwidth=0,
-                        command=lambda: tello.move_back(step))
+                        command=lambda: move_back())
 back_button.place(x=260, y=890)
 
 up_button = tk.Button(root, activebackground="#d9d9d9", image=up_img, borderwidth=0,
-                      command=lambda: tello.move_up(step))
+                      command=lambda: move_up())
 up_button.place(x=650, y=770)
 down_button = tk.Button(root, activebackground="#d9d9d9", image=down_img, borderwidth=0,
-                        command=lambda: tello.move_down(step))
+                        command=lambda: move_down())
 down_button.place(x=650, y=890)
 label = tk.Label(root, text="ADJUST HEIGHT")
 label.place(x=650, y=850)
