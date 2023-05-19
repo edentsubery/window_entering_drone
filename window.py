@@ -90,4 +90,20 @@ def get_direction(window_bbox):
 lower = np.array([50, 50, 50])
 upper = np.array([150, 150, 150])
 
+def enter(window_bbox):
+    print("searching direction for dest: ", window_bbox)
+    direction = "UNKNOWN"
+    # get the center coordinates of the window bbox
+    x_center = (window_bbox[0] + window_bbox[2]) // 2
+    y_center = (window_bbox[1] + window_bbox[3]) // 2
+
+    # Update the Kalman filter with the object's position
+    kalman_filter.update(np.array([[center_x], [center_y]]))
+
+    # Get the estimated position from the Kalman filter
+    estimated_position = kalman_filter.x[:2].flatten()
+    est_x, est_y = estimated_position
+
+    # Draw the estimated position on the frame
+    cv2.circle(picker.frame, (int(est_x), int(est_y)), 5, (0, 255, 0), -1)
 

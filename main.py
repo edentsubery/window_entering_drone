@@ -1,6 +1,10 @@
 import time
 import tkinter as tk
 import colorsys
+
+import tkinter.messagebox as messagebox
+
+import numpy as np
 from PIL import Image, ImageTk
 from djitellopy import Tello
 from ultralytics import YOLO
@@ -8,12 +12,16 @@ from window import get_direction
 from window import fly_through_window
 import cv2
 import threading
+from filterpy.kalman import KalmanFilter
+from filterpy.common import Q_discrete_white_noise
+
 
 WIDTH = 720
 HEIGHT = 960
 BUILDING_COLOR = [0, 0, 0]
 LIGHT_COLOR = [0, 0, 0]
 DARK_COLOR = [0, 0, 0]
+
 
 class ColorPicker:
     def __init__(self, master):
@@ -58,65 +66,79 @@ def expand_colors(rgb):
     LIGHT_COLOR = light_color
     DARK_COLOR = dark_color
 
+kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
+kalman_filter.x = np.array([0., 0., 0., 0.])  # Initial state estimate (x, y, dx, dy)
+kalman_filter.F = np.array([[1., 0., 1., 0.],
+                            [0., 1., 0., 1.],
+                            [0., 0., 1., 0.],
+                            [0., 0., 0., 1.]])  # State transition matrix
+kalman_filter.H = np.array([[1., 0., 0., 0.],
+                            [0., 1., 0., 0.]])  # Measurement function
+kalman_filter.P *= 1000.  # Covariance matrix
+kalman_filter.R = np.array([[5., 0.],
+                            [0., 5.]])  # Measurement noise covariance
+kalman_filter.Q = Q_discrete_white_noise(dim=2, dt=0.1, var=0.01)  # Process noise covariance
+
+
+def trackShit(inner_tello, inner_results):
+    global is_circle_drawn
+    print("     trackShit-> window result:", inner_results[0].boxes.xyxy[0])
+    window_bbox = inner_results[0].boxes.xyxy[0]
+
+    # get the center coordinates of the window bbox
+    x_center = (window_bbox[0] + window_bbox[2]) // 2
+    y_center = (window_bbox[1] + window_bbox[3]) // 2
+
+    print("     trackShit-> updating Kalman:")
+    # Update the Kalman filter with the object's position
+    kalman_filter.update(np.array([[x_center], [y_center]]))
+
+    print("     trackShit-> getting estimated_position:")
+    # Get the estimated position from the Kalman filter
+    estimated_position = kalman_filter.x[:2].flatten()
+    est_x, est_y = estimated_position
+
+    print("     trackShit-> drawing circle")
+    # Draw the estimated position on the frame
+    cv2.circle(picker.frame, (int(est_x), int(est_y)), 5, (0, 255, 0), -1)
+    show_circle_image(est_x, est_y)
+    is_circle_drawn = True
+
+
+    # inner_tello.land()
+
+def show_circle_image(inner_est_x, inner_est_y):
+    original_image = Image.fromarray(picker.frame)
+    dialog_box = tk.Toplevel()
+    canvas = tk.Canvas(dialog_box, width=picker.frame.shape[1], height=picker.frame.shape[0])
+    canvas.pack()
+    canvas.create_image(0, 0, anchor="nw", image=picker.photo)
+    canvas.create_oval(int(inner_est_x)-5, int(inner_est_y)-5, int(inner_est_x)+5, int(inner_est_y)+5, outline='red', width=2)
+    dialog_box.mainloop()
 
 def update():
     global ON
     global is_enter_running
+    global is_circle_drawn
     picker.frame = picker.cap.frame
     if ON:
         results = model(picker.frame)
         picker.unmarked = picker.frame
-        if results:
-            picker.frame = results[0].plot()
-            picker.results = results
-            if len(picker.results[0].boxes) != 0:
-                if not is_enter_running:
-                    enter_window_thread = threading.Thread(target=enter_window, args=(results, tello))
-                    enter_window_thread.start()
-                    is_enter_running = True
+        if results and len(results[0].boxes)>0:
+            if not is_enter_running:
+                enter_thread = threading.Thread(target=trackShit, args=(tello, results))
+                enter_thread.start()
+                is_enter_running = True
+                if is_circle_drawn:
+                    messagebox.showinfo("Circle Drawn", "Circle has been drawn!")
+                    root.destroy()  # Close the main window and stop the program
+                    return
+
 
     picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
 
-
-
-def find_window():
-    global ON
-    print("trying to find")
-    if not ON:
-        print("not on")
-        root.after(1000, find_window)
-        return []
-
-    try:
-        #while True:
-            print("searching,no results yet")
-            if (picker.results and len(picker.results[0].boxes)):  # found window, syntax of model
-                print("detected window")
-                #    return picker.results[0].boxes[0]
-                root.after(1000, enter_window)
-                #    root.after(1000, fly_in())
-                return picker.results[0].boxes[0]
-            else:
-                root.after(1000, find_window)
-                return
-        #    time.sleep(1)
-
-#             else:
-#                results= find_building_corner(picker.unmarked, BUILDING_COLOR)
-#                if(results[0] and results[1]==RIGHT):
-#                     handle_edge()
-#                     break
-#                else:
-#                     tello.move_right(20)
-#                     break
-    except KeyboardInterrupt:
-        root.destroy()
-        tello.streamoff()
-        tello.land()
-        tello.end()
-        exit(1)
 
 
 def ask_for_confirmation(x1, y1, x2, y2):
@@ -161,10 +183,6 @@ def ask_for_confirmation(x1, y1, x2, y2):
     # dialog_box.after(1000, ask_for_confirmation)
 
 
-def fly_in():
-    fly_through_window(picker.results[0].boxes.xyxy)
-
-
 def get_tello_command(direction, inner_tello):
     # Define a dictionary that maps directions to Tello commands
     commands = {'UP': 'up 20', 'DOWN': 'down 20', 'LEFT': 'left 20', 'RIGHT': 'right 20', 'CENTER': 'forward 20',
@@ -181,57 +199,40 @@ def get_tello_command(direction, inner_tello):
 
 
 def move_in_direction(direction):
-    if direction=="UNKNOWN":
+    if direction == "UNKNOWN":
         return
-    if direction=="UP":
+    if direction == "UP":
         tello.move_up(step)
         return
-    if direction=="DOWN":
+    if direction == "DOWN":
         tello.move_down(step)
         return
-    if direction=="RIGHT":
+    if direction == "RIGHT":
         tello.move_right(step)
         return
-    if direction=="LEFT":
+    if direction == "LEFT":
         tello.move_left(step)
         return
-    if direction=="CENTER":
+    if direction == "CENTER":
         tello.move_forward(step)
         return
 
 
-def enter_window(results, inner_tello):
-    #     global ON
-    #     if not ON: return
-    direction = False
-    # while direction != "CENTER":
-    # move to direction
-    if (len(picker.results[0].boxes)):  # found window
-        print("saw window in enter")
-        print("window is at: ", picker.results[0].boxes.xyxy)
-        direction = get_direction(picker.results[0].boxes.xyxy[0])
-        print("in enter_window, sending:", direction, " suitable command----->")
-        get_tello_command(direction, tello)
-        print("done with sending command to move: ", direction)
-        #return
-        tello.land()
-    else:
-        print("couldnt see, trying to search")
-        # root.after(1000, find_window)
-        return
+def track_window():
+    pass
 
 
 def engine():
     # ask_for_confirmation(100,100,200,200)
     global ON
     if ON:
-        print ("landing")
+        print("landing")
         tello.land()
         ON = False
     else:
-        #tello.takeoff()
+        # tello.takeoff()
         ON = True
-        print (ON)
+        print(ON)
 
         print("calling engine")
 
@@ -239,7 +240,8 @@ def engine():
 # create a Tello object to control the drone
 step = 20
 ON = False
-is_enter_running = False;
+is_enter_running = False
+is_circle_drawn = False
 model = YOLO("window_detector.pt")
 tello = Tello()
 #
@@ -276,10 +278,12 @@ def move_left():
     tello.move_left(step)  # Move left
     time.sleep(5)  # Wait for 5 seconds
 
+
 def move_right():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_right(step)  # Move right
     time.sleep(5)  # Wait for 5 seconds
+
 
 def move_up():
     tello.send_control_command('command')  # Put the drone in command mode
@@ -287,20 +291,24 @@ def move_up():
     print("up from botton")
     time.sleep(5)  # Wait for 5 seconds
 
+
 def move_down():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_down(step)  # Move down
     time.sleep(5)  # Wait for 5 seconds
+
 
 def move_forward():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_forward(step)  # Move forward
     time.sleep(5)  # Wait for 5 seconds
 
+
 def move_back():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_back(step)  # Move back
     time.sleep(5)  # Wait for 5 seconds
+
 
 left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0,
                         command=lambda: move_left())
@@ -333,6 +341,5 @@ clock_button.place(x=840, y=770)
 counterclock_button = tk.Button(root, activebackground="#d9d9d9", image=counterClock_img, borderwidth=0,
                                 command=lambda: tello.rotate_counter_clockwise(30))
 counterclock_button.place(x=60, y=770)
-
 
 root.mainloop()
