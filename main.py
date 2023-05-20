@@ -4,17 +4,16 @@ import colorsys
 
 import tkinter.messagebox as messagebox
 
+import cv2
 import numpy as np
 from PIL import Image, ImageTk
 from djitellopy import Tello
 from ultralytics import YOLO
-from window import get_direction
-from window import fly_through_window
-import cv2
 import threading
-from filterpy.kalman import KalmanFilter
-from filterpy.common import Q_discrete_white_noise
 
+# Globals:
+is_enter_manually_running = False
+should_return_to_model = False
 WIDTH = 720
 HEIGHT = 960
 BUILDING_COLOR = [0, 0, 0]
@@ -66,107 +65,96 @@ def expand_colors(rgb):
     DARK_COLOR = dark_color
 
 
-kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
-kalman_filter.x = np.array([0., 0., 0., 0.])  # Initial state estimate (x, y, dx, dy)
-kalman_filter.F = np.array([[1., 0., 1., 0.],
-                            [0., 1., 0., 1.],
-                            [0., 0., 1., 0.],
-                            [0., 0., 0., 1.]])  # State transition matrix
-kalman_filter.H = np.array([[1., 0., 0., 0.],
-                            [0., 1., 0., 0.]])  # Measurement function
-kalman_filter.P *= 1000.  # Covariance matrix
-kalman_filter.R = np.array([[5., 0.],
-                            [0., 5.]])  # Measurement noise covariance
-kalman_filter.Q = Q_discrete_white_noise(dim=2, dt=0.1, var=0.01)  # Process noise covariance
+def done_manual_msg_thread():
+    global should_return_to_model
+    pass
 
 
-def trackShit(inner_tello, inner_results):
-    global is_circle_drawn
-    print("     trackShit-> window result:", inner_results[0].boxes.xyxy[0])
-    window_bbox = inner_results[0].boxes.xyxy[0]
-
-    # get the center coordinates of the window bbox
-    x_center = (window_bbox[0] + window_bbox[2]) // 2
-    y_center = (window_bbox[1] + window_bbox[3]) // 2
-
-    print("     trackShit-> updating Kalman:")
-    # Update the Kalman filter with the object's position
-    kalman_filter.update(np.array([[x_center], [y_center]]))
-
-    print("     trackShit-> getting estimated_position:")
-    # Get the estimated position from the Kalman filter
-    estimated_position = kalman_filter.x[:2].flatten()
-    est_x, est_y = estimated_position
-
-    print("     trackShit-> drawing circle")
-    # Draw the estimated position on the frame
-    cv2.circle(picker.frame, (int(est_x), int(est_y)), 5, (0, 255, 0), -1)
-    show_circle_image(est_x, est_y)
-    is_circle_drawn = True
-
-    # inner_tello.land()
+def stop_manual_return_model():
+    global should_return_to_model
+    global is_enter_manually_running
+    should_return_to_model = True
+    is_enter_manually_running = False
+    print(f"The value of should_return_to_model was changed to {should_return_to_model}")
+    print(f"The value of is_enter_manually_running was changed to {is_enter_manually_running}")
 
 
-def show_circle_image(inner_est_x, inner_est_y):
-    original_image = Image.fromarray(picker.frame)
-    dialog_box = tk.Toplevel()
-    canvas = tk.Canvas(dialog_box, width=picker.frame.shape[1], height=picker.frame.shape[0])
-    canvas.pack()
-    canvas.create_image(0, 0, anchor="nw", image=picker.photo)
-    canvas.create_oval(int(inner_est_x) - 5, int(inner_est_y) - 5, int(inner_est_x) + 5, int(inner_est_y) + 5,
-                       outline='red', width=2)
-    dialog_box.mainloop()
+def report_detection_dialog(plotted_detection):
+    dialog = tk.Toplevel(root)
+    # Load and display the image
+    image = Image.open("my_image.png")
+    photo = ImageTk.PhotoImage(image)
+    image_label = tk.Label(dialog, image=photo)
+    image_label.image = photo  # keep a reference to the image
+    image_label.pack()
+
+    # Add other dialog content...
+    message_label = tk.Label(dialog, text="This is my custom dialog with an image.")
+    message_label.pack()
+
+    ok_button = tk.Button(dialog, text="OK", command=dialog.destroy)
+    ok_button.pack()
 
 
 def update():
     global ON
     global is_enter_manually_running
     picker.frame = picker.cap.frame
+
     if ON:
         if not is_enter_manually_running:
             results = model(picker.frame)
+            print ("still entering manually? ", is_enter_manually_running)
             if results and len(results[0].boxes) > 0:
                 picker.unmarked = picker.frame
+                print("plotting")
                 picker.frame = results[0].plot()
                 picker.results = results
+                picker.photo = ImageTk.PhotoImage(image=Image.fromarray(results[0].plot()))
+                picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+
                 # if we're already navigating, don't interrupt
                 answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
                                                                  "would you like to navigate in?")
                 if answer:
                     # user wants to get in - stop model
-                    # enter_manually_thread = threading.Thread(target=trackShit, args=(tello, results))
-                    # enter_manually_thread.start()
                     is_enter_manually_running = True
-                    messagebox.showinfo("Model detection will now be paused.\n you can navigate manually. ")
+                    frame_copy = np.copy(picker.frame)
+                    open_button = tk.Button(root, text="Open Dialog", command=lambda: detected_dialog(frame_copy))
+                    open_button.pack()
+                    messagebox.showinfo("Model detection PAUSED",
+                                        "Model detection will now be paused.\n you can navigate manually. ")
+                    new_window = tk.Toplevel(root)
+                    change_button = tk.Button(new_window, text="return to model", command=stop_manual_return_model)
+                    change_button.pack()
                 else:
                     # user doesn't want to get it- proceed.
                     pass
-
-    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
-    picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+        else:
+            picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+            picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+    else:
+        picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+        picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
 
 
-def ask_for_confirmation(x1, y1, x2, y2):
-    original_image = Image.fromarray(picker.frame)
-    dialog_box = tk.Toplevel()
-    canvas = tk.Canvas(dialog_box, width=580, height=360)
-    pad = 10
-    crop_region = (x1 - pad, y1 - pad, x2 + pad, y2 + pad)
+def detected_dialog(current_plotted_frame):
+    print("opening dialog")
+    dialog_box = tk.Toplevel(root)
+    dialog_box.geometry = ("400x400")
 
-    cropped = original_image.crop(crop_region)
+    # Convert the OpenCV image (BGR) to a PIL image (RGB)
+    current_plotted_frame = cv2.cvtColor(current_plotted_frame, cv2.COLOR_BGR2RGB)
+    image = Image.fromarray(current_plotted_frame)
 
-    # Create a canvas widget to display the image
-    canvas = tk.Canvas(dialog_box, width=cropped.width, height=cropped.height)
-    canvas.pack()
+    # Convert the PIL image to a PhotoImage, which Tkinter can display
+    photo = ImageTk.PhotoImage(image)
 
-    # Convert the cropped image to a Tkinter PhotoImage
-    tk_image = ImageTk.PhotoImage(cropped)
-
-    # Add the image to the canvas
-    canvas.create_image(0, 0, anchor="nw", image=tk_image)
-    label = tk.Label(dialog_box, text="Enter marked window?")
-    label.pack()
+    # Display the image
+    image_label = tk.Label(dialog_box, image=photo)
+    image_label.image = photo  # keep a reference to the image
+    image_label.pack()
 
     # Create a function to handle the user's button click
     def on_button_click():
@@ -244,16 +232,18 @@ def engine():
 # create a Tello object to control the drone
 step = 20
 ON = False
-is_enter_manually_running = False
+print("     main-> starting Model")
 model = YOLO("window_detector.pt")
+print("     main-> starting Tello")
 tello = Tello()
-#
-# # set up the video stream from the Tello drone
-tello.connect()
 
+# set up the video stream from the Tello drone
+print("     main-> connecting tello and start streaming")
+tello.connect()
 tello.streamon()
 
 # set up the GUI
+print("     main-> starting tkinter")
 root = tk.Tk()
 root.title("Tello Control GUI")
 root.geometry("800x800")
