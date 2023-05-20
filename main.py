@@ -15,7 +15,6 @@ import threading
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
-
 WIDTH = 720
 HEIGHT = 960
 BUILDING_COLOR = [0, 0, 0]
@@ -66,6 +65,7 @@ def expand_colors(rgb):
     LIGHT_COLOR = light_color
     DARK_COLOR = dark_color
 
+
 kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
 kalman_filter.x = np.array([0., 0., 0., 0.])  # Initial state estimate (x, y, dx, dy)
 kalman_filter.F = np.array([[1., 0., 1., 0.],
@@ -104,8 +104,8 @@ def trackShit(inner_tello, inner_results):
     show_circle_image(est_x, est_y)
     is_circle_drawn = True
 
-
     # inner_tello.land()
+
 
 def show_circle_image(inner_est_x, inner_est_y):
     original_image = Image.fromarray(picker.frame)
@@ -113,32 +113,38 @@ def show_circle_image(inner_est_x, inner_est_y):
     canvas = tk.Canvas(dialog_box, width=picker.frame.shape[1], height=picker.frame.shape[0])
     canvas.pack()
     canvas.create_image(0, 0, anchor="nw", image=picker.photo)
-    canvas.create_oval(int(inner_est_x)-5, int(inner_est_y)-5, int(inner_est_x)+5, int(inner_est_y)+5, outline='red', width=2)
+    canvas.create_oval(int(inner_est_x) - 5, int(inner_est_y) - 5, int(inner_est_x) + 5, int(inner_est_y) + 5,
+                       outline='red', width=2)
     dialog_box.mainloop()
+
 
 def update():
     global ON
-    global is_enter_running
-    global is_circle_drawn
+    global is_enter_manually_running
     picker.frame = picker.cap.frame
     if ON:
-        results = model(picker.frame)
-        picker.unmarked = picker.frame
-        if results and len(results[0].boxes)>0:
-            if not is_enter_running:
-                enter_thread = threading.Thread(target=trackShit, args=(tello, results))
-                enter_thread.start()
-                is_enter_running = True
-                if is_circle_drawn:
-                    messagebox.showinfo("Circle Drawn", "Circle has been drawn!")
-                    root.destroy()  # Close the main window and stop the program
-                    return
-
+        if not is_enter_manually_running:
+            results = model(picker.frame)
+            if results and len(results[0].boxes) > 0:
+                picker.unmarked = picker.frame
+                picker.frame = results[0].plot()
+                picker.results = results
+                # if we're already navigating, don't interrupt
+                answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
+                                                                 "would you like to navigate in?")
+                if answer:
+                    # user wants to get in - stop model
+                    # enter_manually_thread = threading.Thread(target=trackShit, args=(tello, results))
+                    # enter_manually_thread.start()
+                    is_enter_manually_running = True
+                    messagebox.showinfo("Model detection will now be paused.\n you can navigate manually. ")
+                else:
+                    # user doesn't want to get it- proceed.
+                    pass
 
     picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
-
 
 
 def ask_for_confirmation(x1, y1, x2, y2):
@@ -226,22 +232,19 @@ def engine():
     # ask_for_confirmation(100,100,200,200)
     global ON
     if ON:
-        print("landing")
+        print("     engine-> drone is landing")
         tello.land()
         ON = False
     else:
         # tello.takeoff()
         ON = True
-        print(ON)
-
-        print("calling engine")
+        print("     engine-> drone mode is: ", ON)
 
 
 # create a Tello object to control the drone
 step = 20
 ON = False
-is_enter_running = False
-is_circle_drawn = False
+is_enter_manually_running = False
 model = YOLO("window_detector.pt")
 tello = Tello()
 #
@@ -333,7 +336,7 @@ label = tk.Label(root, text="ADJUST HEIGHT")
 label.place(x=650, y=850)
 
 land_button = tk.Button(root, activebackground="#d9d9d9", image=engine_img, borderwidth=0, command=engine)
-land_button.place(x=400, y=750)
+land_button.place(x=10, y=10)
 
 clock_button = tk.Button(root, activebackground="#d9d9d9", image=clock_img, borderwidth=0,
                          command=lambda: tello.rotate_clockwise(30))
