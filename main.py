@@ -12,6 +12,9 @@ from ultralytics import YOLO
 import threading
 
 # Globals:
+change_button = None
+open_button = None
+
 is_enter_manually_running = False
 should_return_to_model = False
 WIDTH = 720
@@ -24,7 +27,7 @@ DARK_COLOR = [0, 0, 0]
 class ColorPicker:
     def __init__(self, master):
         self.master = master
-        self.canvas = tk.Canvas(master, width=960, height=720)
+        self.canvas = tk.Canvas(master, width=500, height=400)
         self.canvas.place(x=20, y=20)
         self.canvas.bind("<Button-1>", self.get_color)
 
@@ -77,6 +80,8 @@ def stop_manual_return_model():
     is_enter_manually_running = False
     print(f"The value of should_return_to_model was changed to {should_return_to_model}")
     print(f"The value of is_enter_manually_running was changed to {is_enter_manually_running}")
+    change_button.pack_forget()
+    open_button.pack_forget()
 
 
 def report_detection_dialog(plotted_detection):
@@ -99,13 +104,14 @@ def report_detection_dialog(plotted_detection):
 def update():
     global ON
     global is_enter_manually_running
+    global change_button, open_button
     picker.frame = picker.cap.frame
 
     if ON:
+        print("still entering manually? ", is_enter_manually_running)
         if not is_enter_manually_running:
             results = model(picker.frame)
-            print ("still entering manually? ", is_enter_manually_running)
-            if results and len(results[0].boxes) > 0:
+            if results and len(results[0].boxes)>0:
                 picker.unmarked = picker.frame
                 print("plotting")
                 picker.frame = results[0].plot()
@@ -129,7 +135,10 @@ def update():
                     change_button.pack()
                 else:
                     # user doesn't want to get it- proceed.
-                    pass
+                    print("        update-> don't want to get it- move on.")
+            else:
+                picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+                picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
         else:
             picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
             picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
@@ -224,7 +233,7 @@ def engine():
         tello.land()
         ON = False
     else:
-        # tello.takeoff()
+        tello.takeoff()
         ON = True
         print("     engine-> drone mode is: ", ON)
 
@@ -246,84 +255,85 @@ tello.streamon()
 print("     main-> starting tkinter")
 root = tk.Tk()
 root.title("Tello Control GUI")
-root.geometry("800x800")
+root.geometry("700x500")
 
 picker = ColorPicker(root)
-picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=picker.photo)
+small_photo = picker.photo
+picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=small_photo)
 root.after(10, update)
 
-click_btn = tk.PhotoImage(file="buttons/left.png")
-forward_img = tk.PhotoImage(file="buttons/forward.png")
-back_img = tk.PhotoImage(file="buttons/back.png")
-left_img = tk.PhotoImage(file="buttons/left.png")
-right_img = tk.PhotoImage(file="buttons/right.png")
-engine_img = tk.PhotoImage(file="buttons/engine.png")
-clock_img = tk.PhotoImage(file="buttons/clockwise.png")
-counterClock_img = tk.PhotoImage(file="buttons/counter.png")
-up_img = tk.PhotoImage(file="buttons/up.png")
-down_img = tk.PhotoImage(file="buttons/down.png")
-reject_img = tk.PhotoImage(file="buttons/reject.png")
-accept_img = tk.PhotoImage(file="buttons/accept.png")
+click_btn = tk.PhotoImage(file="buttons/left.png").subsample(2)
+forward_img = tk.PhotoImage(file="buttons/forward.png").subsample(2)
+back_img = tk.PhotoImage(file="buttons/back.png").subsample(2)
+left_img = tk.PhotoImage(file="buttons/left.png").subsample(2)
+right_img = tk.PhotoImage(file="buttons/right.png").subsample(2)
+engine_img = tk.PhotoImage(file="buttons/engine.png").subsample(2)
+clock_img = tk.PhotoImage(file="buttons/clockwise.png").subsample(2)
+counterClock_img = tk.PhotoImage(file="buttons/counter.png").subsample(2)
+up_img = tk.PhotoImage(file="buttons/up.png").subsample(2)
+down_img = tk.PhotoImage(file="buttons/down.png").subsample(2)
+reject_img = tk.PhotoImage(file="buttons/reject.png").subsample(2)
+accept_img = tk.PhotoImage(file="buttons/accept.png").subsample(2)
 
 
 def move_left():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_left(step)  # Move left
-    time.sleep(5)  # Wait for 5 seconds
+    time.sleep(1)  # Wait for 5 seconds
 
 
 def move_right():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_right(step)  # Move right
-    time.sleep(5)  # Wait for 5 seconds
+    time.sleep(1)  # Wait for 5 seconds
 
 
 def move_up():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_up(step)  # Move up
     print("up from botton")
-    time.sleep(5)  # Wait for 5 seconds
+    time.sleep(1)  # Wait for 5 seconds
 
 
 def move_down():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_down(step)  # Move down
-    time.sleep(5)  # Wait for 5 seconds
+    time.sleep(1)  # Wait for 5 seconds
 
 
 def move_forward():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_forward(step)  # Move forward
-    time.sleep(5)  # Wait for 5 seconds
+    time.sleep(1)  # Wait for 5 seconds
 
 
 def move_back():
     tello.send_control_command('command')  # Put the drone in command mode
     tello.move_back(step)  # Move back
-    time.sleep(5)  # Wait for 5 seconds
+    time.sleep(1)  # Wait for 5 seconds
 
 
 left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0,
                         command=lambda: move_left())
-left_button.place(x=200, y=830)
+left_button.place(x=200, y=500)
 right_button = tk.Button(root, activebackground="#d9d9d9", image=right_img, borderwidth=0,
                          command=lambda: move_right())
-right_button.place(x=320, y=830)
+right_button.place(x=320, y=500)
 forward_button = tk.Button(root, activebackground="#d9d9d9", image=forward_img, borderwidth=0,
                            command=lambda: move_forward())
-forward_button.place(x=260, y=770)
+forward_button.place(x=260, y=400)
 back_button = tk.Button(root, activebackground="#d9d9d9", image=back_img, borderwidth=0,
                         command=lambda: move_back())
-back_button.place(x=260, y=890)
+back_button.place(x=260, y=500)
 
 up_button = tk.Button(root, activebackground="#d9d9d9", image=up_img, borderwidth=0,
                       command=lambda: move_up())
-up_button.place(x=650, y=770)
+up_button.place(x=650, y=400)
 down_button = tk.Button(root, activebackground="#d9d9d9", image=down_img, borderwidth=0,
                         command=lambda: move_down())
-down_button.place(x=650, y=890)
+down_button.place(x=650, y=500)
 label = tk.Label(root, text="ADJUST HEIGHT")
-label.place(x=650, y=850)
+label.place(x=650, y=500)
 
 land_button = tk.Button(root, activebackground="#d9d9d9", image=engine_img, borderwidth=0, command=engine)
 land_button.place(x=10, y=10)
