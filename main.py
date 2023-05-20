@@ -12,8 +12,8 @@ from window import get_direction
 from window import fly_through_window
 import cv2
 import threading
-from filterpy.kalman import KalmanFilter
-from filterpy.common import Q_discrete_white_noise
+#from filterpy.kalman import KalmanFilter
+#from filterpy.common import Q_discrete_white_noise
 
 WIDTH = 720
 HEIGHT = 960
@@ -25,16 +25,22 @@ DARK_COLOR = [0, 0, 0]
 class ColorPicker:
     def __init__(self, master):
         self.master = master
-        self.canvas = tk.Canvas(master, width=960, height=720)
-        self.canvas.place(x=20, y=20)
+        self.canvas = tk.Canvas(master, width=720, height=540)
+        self.canvas.grid(row=0, column=0, columnspan=12)
         self.canvas.bind("<Button-1>", self.get_color)
 
-        self.cap = tello.get_frame_read()
-        self.frame = self.cap.frame
-        self.results = []
-        self.unmarked = self.frame
-        self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
+        try:
+            self.cap = tello.get_frame_read()
+            self.frame = self.cap.frame
+            self.frame= cv2.resize(self.frame, (720, 540))
+            self.results = []
+            self.unmarked = self.frame
+            self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
+        except cv2.error as e:
+            # Ignore specific error messages related to H.264 codec
+            if not 'non-existing PPS' in str(e) or 'decode_slice_header error' in str(e):
+                raise e
 
     def get_color(self, event):
         x, y = event.x, event.y
@@ -65,19 +71,6 @@ def expand_colors(rgb):
     LIGHT_COLOR = light_color
     DARK_COLOR = dark_color
 
-
-kalman_filter = KalmanFilter(dim_x=4, dim_z=2)
-kalman_filter.x = np.array([0., 0., 0., 0.])  # Initial state estimate (x, y, dx, dy)
-kalman_filter.F = np.array([[1., 0., 1., 0.],
-                            [0., 1., 0., 1.],
-                            [0., 0., 1., 0.],
-                            [0., 0., 0., 1.]])  # State transition matrix
-kalman_filter.H = np.array([[1., 0., 0., 0.],
-                            [0., 1., 0., 0.]])  # Measurement function
-kalman_filter.P *= 1000.  # Covariance matrix
-kalman_filter.R = np.array([[5., 0.],
-                            [0., 5.]])  # Measurement noise covariance
-kalman_filter.Q = Q_discrete_white_noise(dim=2, dt=0.1, var=0.01)  # Process noise covariance
 
 
 def trackShit(inner_tello, inner_results):
@@ -121,31 +114,37 @@ def show_circle_image(inner_est_x, inner_est_y):
 def update():
     global ON
     global is_enter_manually_running
-    picker.frame = picker.cap.frame
-    if ON:
-        if not is_enter_manually_running:
-            results = model(picker.frame)
-            if results and len(results[0].boxes) > 0:
-                picker.unmarked = picker.frame
-                picker.frame = results[0].plot()
-                picker.results = results
-                # if we're already navigating, don't interrupt
-                answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
-                                                                 "would you like to navigate in?")
-                if answer:
-                    # user wants to get in - stop model
-                    # enter_manually_thread = threading.Thread(target=trackShit, args=(tello, results))
-                    # enter_manually_thread.start()
-                    is_enter_manually_running = True
-                    messagebox.showinfo("Model detection will now be paused.\n you can navigate manually. ")
-                else:
-                    # user doesn't want to get it- proceed.
-                    pass
+    try:
+        picker.frame = picker.cap.frame
+        picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
+        picker.frame= cv2.resize(picker.frame, (720, 540))
+        if ON:
+            if not is_enter_manually_running:
+                results = model(picker.frame)
+                if results and len(results[0].boxes) > 0:
+                    picker.unmarked = picker.frame
+                    picker.frame = results[0].plot()
+                    picker.results = results
+                    # if we're already navigating, don't interrupt
+                    answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
+                                                                     "would you like to navigate in?")
+                    if answer:
+                        # user wants to get in - stop model
+                        # enter_manually_thread = threading.Thread(target=trackShit, args=(tello, results))
+                        # enter_manually_thread.start()
+                        is_enter_manually_running = True
+                        messagebox.showinfo("Model detection will now be paused.\n you can navigate manually. ")
+                    else:
+                        # user doesn't want to get it- proceed.
+                        pass
 
-    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
-    picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+        picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+        picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+    except cv2.error as e:
+        # Ignore specific error messages related to H.264 codec
+        if not 'non-existing PPS' in str(e) or 'decode_slice_header error' in str(e):
+            raise e
     picker.master.after(10, update)
-
 
 def ask_for_confirmation(x1, y1, x2, y2):
     original_image = Image.fromarray(picker.frame)
@@ -256,7 +255,7 @@ tello.streamon()
 # set up the GUI
 root = tk.Tk()
 root.title("Tello Control GUI")
-root.geometry("800x800")
+
 
 picker = ColorPicker(root)
 picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=picker.photo)
@@ -315,34 +314,42 @@ def move_back():
 
 left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0,
                         command=lambda: move_left())
-left_button.place(x=200, y=830)
+#left_button.place(x=200, y=430)
+left_button.grid(row=2, column=0)
 right_button = tk.Button(root, activebackground="#d9d9d9", image=right_img, borderwidth=0,
                          command=lambda: move_right())
-right_button.place(x=320, y=830)
+#right_button.place(x=320, y=430)
+right_button.grid(row=2, column=2)
 forward_button = tk.Button(root, activebackground="#d9d9d9", image=forward_img, borderwidth=0,
                            command=lambda: move_forward())
-forward_button.place(x=260, y=770)
+#forward_button.place(x=260, y=370)
+forward_button.grid(row=1, column=1)
 back_button = tk.Button(root, activebackground="#d9d9d9", image=back_img, borderwidth=0,
                         command=lambda: move_back())
-back_button.place(x=260, y=890)
-
+#back_button.place(x=260, y=490)
+back_button.grid(row=3, column=1)
 up_button = tk.Button(root, activebackground="#d9d9d9", image=up_img, borderwidth=0,
                       command=lambda: move_up())
-up_button.place(x=650, y=770)
+#up_button.place(x=650, y=370)
+up_button.grid(row=1, column=10)
 down_button = tk.Button(root, activebackground="#d9d9d9", image=down_img, borderwidth=0,
                         command=lambda: move_down())
-down_button.place(x=650, y=890)
+#down_button.place(x=650, y=490)
+down_button.grid(row=3, column=10)
 label = tk.Label(root, text="ADJUST HEIGHT")
-label.place(x=650, y=850)
+#label.place(x=650, y=450)
+label.grid(row=2,column=10)
 
 land_button = tk.Button(root, activebackground="#d9d9d9", image=engine_img, borderwidth=0, command=engine)
-land_button.place(x=10, y=10)
+land_button.grid(row=1,column=3, columnspan=6, rowspan=3)
 
 clock_button = tk.Button(root, activebackground="#d9d9d9", image=clock_img, borderwidth=0,
                          command=lambda: tello.rotate_clockwise(30))
-clock_button.place(x=840, y=770)
+#clock_button.place(x=840, y=370)
+clock_button.grid(row=1,column= 11)
 counterclock_button = tk.Button(root, activebackground="#d9d9d9", image=counterClock_img, borderwidth=0,
                                 command=lambda: tello.rotate_counter_clockwise(30))
-counterclock_button.place(x=60, y=770)
+#counterclock_button.place(x=60, y=370)
+counterclock_button.grid(row=3, column=11)
 
 root.mainloop()
