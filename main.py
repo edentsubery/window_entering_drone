@@ -29,12 +29,13 @@ last_no_answer_time = 0
 class ColorPicker:
     def __init__(self, master):
         self.master = master
-        self.canvas = tk.Canvas(master, width=500, height=400)
-        self.canvas.place(x=20, y=20)
+        self.canvas = tk.Canvas(master, width=720, height=540)
+        self.canvas.grid(row=0, column=0, columnspan=12)
         self.canvas.bind("<Button-1>", self.get_color)
 
         self.cap = tello.get_frame_read()
         self.frame = self.cap.frame
+        self.frame= cv2.resize(self.frame, (720, 540))
         self.results = []
         self.unmarked = self.frame
         self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
@@ -109,7 +110,8 @@ def update():
     global change_button, open_button
     global last_no_answer_time
     picker.frame = picker.cap.frame
-
+    picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
+    picker.frame= cv2.resize(picker.frame, (720, 540))
     if ON:
         print("still entering manually? ", is_enter_manually_running)
         if time.time() - last_no_answer_time >= 5:
@@ -246,39 +248,38 @@ def engine():
 # create a Tello object to control the drone
 step = 20
 ON = False
+is_enter_manually_running = False
 print("     main-> starting Model")
 model = YOLO("window_detector.pt")
-print("     main-> starting Tello")
 tello = Tello()
 
 # set up the video stream from the Tello drone
 print("     main-> connecting tello and start streaming")
 tello.connect()
+
 tello.streamon()
 
 # set up the GUI
-print("     main-> starting tkinter")
 root = tk.Tk()
 root.title("Tello Control GUI")
-root.geometry("700x500")
+
 
 picker = ColorPicker(root)
-small_photo = picker.photo
-picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=small_photo)
+picker.canvas_image = picker.canvas.create_image(0, 0, anchor=tk.NW, image=picker.photo)
 root.after(10, update)
 
-click_btn = tk.PhotoImage(file="buttons/left.png").subsample(2)
-forward_img = tk.PhotoImage(file="buttons/forward.png").subsample(2)
-back_img = tk.PhotoImage(file="buttons/back.png").subsample(2)
-left_img = tk.PhotoImage(file="buttons/left.png").subsample(2)
-right_img = tk.PhotoImage(file="buttons/right.png").subsample(2)
-engine_img = tk.PhotoImage(file="buttons/engine.png").subsample(2)
-clock_img = tk.PhotoImage(file="buttons/clockwise.png").subsample(2)
-counterClock_img = tk.PhotoImage(file="buttons/counter.png").subsample(2)
-up_img = tk.PhotoImage(file="buttons/up.png").subsample(2)
-down_img = tk.PhotoImage(file="buttons/down.png").subsample(2)
-reject_img = tk.PhotoImage(file="buttons/reject.png").subsample(2)
-accept_img = tk.PhotoImage(file="buttons/accept.png").subsample(2)
+click_btn = tk.PhotoImage(file="buttons/left.png")
+forward_img = tk.PhotoImage(file="buttons/forward.png")
+back_img = tk.PhotoImage(file="buttons/back.png")
+left_img = tk.PhotoImage(file="buttons/left.png")
+right_img = tk.PhotoImage(file="buttons/right.png")
+engine_img = tk.PhotoImage(file="buttons/engine.png")
+clock_img = tk.PhotoImage(file="buttons/clockwise.png")
+counterClock_img = tk.PhotoImage(file="buttons/counter.png")
+up_img = tk.PhotoImage(file="buttons/up.png")
+down_img = tk.PhotoImage(file="buttons/down.png")
+reject_img = tk.PhotoImage(file="buttons/reject.png")
+accept_img = tk.PhotoImage(file="buttons/accept.png")
 
 
 def move_left():
@@ -320,34 +321,42 @@ def move_back():
 
 left_button = tk.Button(root, activebackground="#d9d9d9", image=left_img, borderwidth=0,
                         command=lambda: move_left())
-left_button.place(x=200, y=500)
+#left_button.place(x=200, y=430)
+left_button.grid(row=2, column=0)
 right_button = tk.Button(root, activebackground="#d9d9d9", image=right_img, borderwidth=0,
                          command=lambda: move_right())
-right_button.place(x=320, y=500)
+#right_button.place(x=320, y=430)
+right_button.grid(row=2, column=2)
 forward_button = tk.Button(root, activebackground="#d9d9d9", image=forward_img, borderwidth=0,
                            command=lambda: move_forward())
-forward_button.place(x=260, y=400)
+#forward_button.place(x=260, y=370)
+forward_button.grid(row=1, column=1)
 back_button = tk.Button(root, activebackground="#d9d9d9", image=back_img, borderwidth=0,
                         command=lambda: move_back())
-back_button.place(x=260, y=500)
-
+#back_button.place(x=260, y=490)
+back_button.grid(row=3, column=1)
 up_button = tk.Button(root, activebackground="#d9d9d9", image=up_img, borderwidth=0,
                       command=lambda: move_up())
-up_button.place(x=650, y=400)
+#up_button.place(x=650, y=370)
+up_button.grid(row=1, column=10)
 down_button = tk.Button(root, activebackground="#d9d9d9", image=down_img, borderwidth=0,
                         command=lambda: move_down())
-down_button.place(x=650, y=500)
+#down_button.place(x=650, y=490)
+down_button.grid(row=3, column=10)
 label = tk.Label(root, text="ADJUST HEIGHT")
-label.place(x=650, y=500)
+#label.place(x=650, y=450)
+label.grid(row=2,column=10)
 
 land_button = tk.Button(root, activebackground="#d9d9d9", image=engine_img, borderwidth=0, command=engine)
-land_button.place(x=10, y=10)
+land_button.grid(row=1,column=3, columnspan=6, rowspan=3)
 
 clock_button = tk.Button(root, activebackground="#d9d9d9", image=clock_img, borderwidth=0,
                          command=lambda: tello.rotate_clockwise(30))
-clock_button.place(x=840, y=770)
+#clock_button.place(x=840, y=370)
+clock_button.grid(row=1,column= 11)
 counterclock_button = tk.Button(root, activebackground="#d9d9d9", image=counterClock_img, borderwidth=0,
                                 command=lambda: tello.rotate_counter_clockwise(30))
-counterclock_button.place(x=60, y=770)
+#counterclock_button.place(x=60, y=370)
+counterclock_button.grid(row=3, column=11)
 
 root.mainloop()
