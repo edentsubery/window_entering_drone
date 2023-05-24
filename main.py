@@ -10,6 +10,7 @@ from djitellopy import Tello
 from ultralytics import YOLO
 from window import get_direction
 from window import fly_through_window
+from rectanle_detection import detect_and_check_rectangles
 import cv2
 import threading
 WIDTH = 720
@@ -117,6 +118,9 @@ def update():
             picker.unmarked = picker.frame
             picker.frame = results[0].plot()
             picker.results = results
+            # image1, windows, is_within_rectangles=detect_and_check_rectangles(picker.frame, result[0].boxes.xywh)
+            #can try to plot only if there is a true in "is_within_rectangles" to only plot something that is a rectangle
+            #might give better results and less false positives
         if not is_enter_manually_running:
                 # if we're already navigating, don't interrupt
                 answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
