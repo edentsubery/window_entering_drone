@@ -12,9 +12,6 @@ from window import get_direction
 from window import fly_through_window
 import cv2
 import threading
-#from filterpy.kalman import KalmanFilter
-#from filterpy.common import Q_discrete_white_noise
-
 WIDTH = 720
 HEIGHT = 960
 BUILDING_COLOR = [0, 0, 0]
@@ -29,18 +26,15 @@ class ColorPicker:
         self.canvas.grid(row=0, column=0, columnspan=12)
         self.canvas.bind("<Button-1>", self.get_color)
 
-        try:
-            self.cap = tello.get_frame_read()
-            self.frame = self.cap.frame
-            self.frame= cv2.resize(self.frame, (720, 540))
-            self.results = []
-            self.unmarked = self.frame
-            self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
-            self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
-        except cv2.error as e:
-            # Ignore specific error messages related to H.264 codec
-            if not 'non-existing PPS' in str(e) or 'decode_slice_header error' in str(e):
-                raise e
+
+        self.cap = tello.get_frame_read()
+        self.frame = self.cap.frame
+        self.frame= cv2.resize(self.frame, (720, 540))
+        self.results = []
+        self.unmarked = self.frame
+        self.photo = ImageTk.PhotoImage(image=Image.fromarray(self.frame))
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
+
 
     def get_color(self, event):
         x, y = event.x, event.y
@@ -114,43 +108,43 @@ def show_circle_image(inner_est_x, inner_est_y):
 def update():
     global ON
     global is_enter_manually_running
-    try:
-        picker.frame = picker.cap.frame
-        picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
-        picker.frame= cv2.resize(picker.frame, (720, 540))
-        if ON:
-            if not is_enter_manually_running:
-                results = model(picker.frame)
-                if results and len(results[0].boxes) > 0:
-                    picker.unmarked = picker.frame
-                    picker.frame = results[0].plot()
-                    picker.results = results
-                    # if we're already navigating, don't interrupt
-                    answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
-                                                                     "would you like to navigate in?")
-                    if answer:
-                        # user wants to get in - stop model
-                        # enter_manually_thread = threading.Thread(target=trackShit, args=(tello, results))
-                        # enter_manually_thread.start()
-                        is_enter_manually_running = True
-                        messagebox.showinfo("Model detection will now be paused.\n you can navigate manually. ")
-                    else:
-                        # user doesn't want to get it- proceed.
-                        pass
+    picker.frame = picker.cap.frame
+    picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
+    picker.frame= cv2.resize(picker.frame, (720, 540))
+    if ON:
+        results = model(picker.frame)
+        if results and len(results[0].boxes) > 0:
+            picker.unmarked = picker.frame
+            picker.frame = results[0].plot()
+            picker.results = results
+        if not is_enter_manually_running:
+                # if we're already navigating, don't interrupt
+                answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
+                                                                 "would you like to navigate in?")
+#                 answer=ask_for_confirmation(picker.results[0].boxes[0].xyxy[0])
+                if answer:
+                    # user wants to get in - stop model
+#                     enter_manually_thread = threading.Thread(target=trackShit, args=(tello, results))
+#                     enter_manually_thread.start()
+                    is_enter_manually_running = True
+                    messagebox.showinfo(title=None, message="Model detection will now be paused.\nYou can navigate manually. ")
+                else:
+                    # user doesn't want to get it- proceed.
+                    pass
 
-        picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
-        picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
-    except cv2.error as e:
-        # Ignore specific error messages related to H.264 codec
-        if not 'non-existing PPS' in str(e) or 'decode_slice_header error' in str(e):
-            raise e
+    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+    picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
     picker.master.after(10, update)
 
-def ask_for_confirmation(x1, y1, x2, y2):
+
+def ask_for_confirmation(bbox_xyxy):
+    x1,y1,x2,y2=bbox_xyxy.cpu().numpy().tolist()
     original_image = Image.fromarray(picker.frame)
+    w=x2-x1
+    h=y2-y1
     dialog_box = tk.Toplevel()
-    canvas = tk.Canvas(dialog_box, width=580, height=360)
     pad = 10
+    canvas = tk.Canvas(dialog_box, width=int(w+2*pad), height=int(h+2*pad))
     crop_region = (x1 - pad, y1 - pad, x2 + pad, y2 + pad)
 
     cropped = original_image.crop(crop_region)
@@ -168,19 +162,25 @@ def ask_for_confirmation(x1, y1, x2, y2):
     label.pack()
 
     # Create a function to handle the user's button click
-    def on_button_click():
+    def on_button_click_yes():
         # If the user clicks the "Yes" button, do something
         # ...
         dialog_box.destroy()  # Close the dialog box
+        return True
+    def on_button_click_no():
+        # If the user clicks the "Yes" button, do something
+        # ...
+        dialog_box.destroy()  # Close the dialog box
+        return False
 
     # Create a "Yes" button using a Tkinter Button widget
     yes_button = up_button = tk.Button(dialog_box, activebackground="#d9d9d9", image=accept_img, borderwidth=0,
-                                       command=on_button_click)
+                                       command=on_button_click_yes)
     yes_button.pack(side="left", padx=10, pady=10)
 
     # Create a "No" button using a Tkinter Button widget
     no_button = tk.Button(dialog_box, activebackground="#d9d9d9", image=reject_img, borderwidth=0,
-                          command=dialog_box.destroy)
+                          command=on_button_click_yes)
     no_button.pack(side="right", padx=10, pady=10)
 
     # Run the Tkinter event loop to display the dialog box and wait for user input
@@ -235,7 +235,7 @@ def engine():
         tello.land()
         ON = False
     else:
-        # tello.takeoff()
+        tello.takeoff()
         ON = True
         print("     engine-> drone mode is: ", ON)
 
