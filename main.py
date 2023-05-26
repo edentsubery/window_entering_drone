@@ -22,6 +22,8 @@ HEIGHT = 960
 BUILDING_COLOR = [0, 0, 0]
 LIGHT_COLOR = [0, 0, 0]
 DARK_COLOR = [0, 0, 0]
+last_no_answer_time = 0
+
 
 
 class ColorPicker:
@@ -105,40 +107,43 @@ def update():
     global ON
     global is_enter_manually_running
     global change_button, open_button
+    global last_no_answer_time
     picker.frame = picker.cap.frame
 
     if ON:
         print("still entering manually? ", is_enter_manually_running)
-        if not is_enter_manually_running:
-            results = model(picker.frame)
-            if results and len(results[0].boxes)>0:
-                picker.unmarked = picker.frame
-                print("plotting")
-                picker.frame = results[0].plot()
-                picker.results = results
-                picker.photo = ImageTk.PhotoImage(image=Image.fromarray(results[0].plot()))
-                picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+        if time.time() - last_no_answer_time >= 5:
+            if not is_enter_manually_running:
+                results = model(picker.frame)
+                if results and len(results[0].boxes)>0:
+                    picker.unmarked = picker.frame
+                    print("plotting")
+                    picker.frame = results[0].plot()
+                    picker.results = results
+                    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(results[0].plot()))
+                    picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
 
-                # if we're already navigating, don't interrupt
-                answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
-                                                                 "would you like to navigate in?")
-                if answer:
-                    # user wants to get in - stop model
-                    is_enter_manually_running = True
-                    frame_copy = np.copy(picker.frame)
-                    open_button = tk.Button(root, text="Open Dialog", command=lambda: detected_dialog(frame_copy))
-                    open_button.pack()
-                    messagebox.showinfo("Model detection PAUSED",
-                                        "Model detection will now be paused.\n you can navigate manually. ")
-                    new_window = tk.Toplevel(root)
-                    change_button = tk.Button(new_window, text="return to model", command=stop_manual_return_model)
-                    change_button.pack()
+                    # if we're already navigating, don't interrupt
+                    answer = messagebox.askyesno("Window is found!", "window is found in position: \n"
+                                                                     "would you like to navigate in?")
+                    if answer:
+                        # user wants to get in - stop model
+                        is_enter_manually_running = True
+                        frame_copy = np.copy(picker.frame)
+                        open_button = tk.Button(root, text="Open Dialog", command=lambda: detected_dialog(frame_copy))
+                        open_button.pack()
+                        messagebox.showinfo("Model detection PAUSED",
+                                            "Model detection will now be paused.\n you can navigate manually. ")
+                        new_window = tk.Toplevel(root)
+                        change_button = tk.Button(new_window, text="return to model", command=stop_manual_return_model)
+                        change_button.pack()
+                    else:
+                        # user doesn't want to get it- proceed.
+                        last_no_answer_time = time.time()
+                        print("        update-> don't want to get it- move on.")
                 else:
-                    # user doesn't want to get it- proceed.
-                    print("        update-> don't want to get it- move on.")
-            else:
-                picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
-                picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+                    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+                    picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
         else:
             picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
             picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
