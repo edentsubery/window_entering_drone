@@ -83,8 +83,8 @@ def stop_manual_return_model():
     is_enter_manually_running = False
     print(f"The value of should_return_to_model was changed to {should_return_to_model}")
     print(f"The value of is_enter_manually_running was changed to {is_enter_manually_running}")
-    change_button.pack_forget()
-    open_button.pack_forget()
+    change_button.grid_forget()
+    open_button.grid_forget()
 
 
 def report_detection_dialog(plotted_detection):
@@ -113,8 +113,8 @@ def update():
     picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
     picker.frame= cv2.resize(picker.frame, (720, 540))
     if ON:
-        print("still entering manually? ", is_enter_manually_running)
-        if time.time() - last_no_answer_time >= 5:
+        # print("still entering manually? ", is_enter_manually_running)
+        if time.time() - last_no_answer_time >= 3:
             if not is_enter_manually_running:
                 results = model(picker.frame)
                 if results and len(results[0].boxes)>0:
@@ -133,12 +133,16 @@ def update():
                         is_enter_manually_running = True
                         frame_copy = np.copy(picker.frame)
                         open_button = tk.Button(root, text="Open Dialog", command=lambda: detected_dialog(frame_copy))
-                        open_button.pack()
+                        # open_button.pack()
+                        open_button.grid(row=4, column=1)
+
                         messagebox.showinfo("Model detection PAUSED",
                                             "Model detection will now be paused.\n you can navigate manually. ")
                         new_window = tk.Toplevel(root)
                         change_button = tk.Button(new_window, text="return to model", command=stop_manual_return_model)
-                        change_button.pack()
+                        # change_button.pack()
+                        change_button.grid(row=4, column=2)
+
                     else:
                         # user doesn't want to get it- proceed.
                         last_no_answer_time = time.time()
@@ -161,7 +165,7 @@ def detected_dialog(current_plotted_frame):
     dialog_box.geometry = ("400x400")
 
     # Convert the OpenCV image (BGR) to a PIL image (RGB)
-    current_plotted_frame = cv2.cvtColor(current_plotted_frame, cv2.COLOR_BGR2RGB)
+    current_plotted_frame = cv2.cvtColor(current_plotted_frame, cv2.COLOR_BGR2Lab)
     image = Image.fromarray(current_plotted_frame)
 
     # Convert the PIL image to a PhotoImage, which Tkinter can display
