@@ -110,19 +110,23 @@ def update():
     global change_button, open_button
     global last_no_answer_time
     picker.frame = picker.cap.frame
-    picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
     picker.frame= cv2.resize(picker.frame, (720, 540))
+    picker.frametomodel = picker.frame
+    picker.frametomodel = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2YCrCb)
+    picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2RGB)
     if ON:
         # print("still entering manually? ", is_enter_manually_running)
         if time.time() - last_no_answer_time >= 3:
             if not is_enter_manually_running:
-                results = model(picker.frame)
+                #picker.frametomodel = cv2.cvtColor(picker.frame, cv2.COLOR_BGR2YUV)
+                results = model(picker.frametomodel)
                 if results and len(results[0].boxes)>0:
                     picker.unmarked = picker.frame
                     print("plotting")
                     picker.frame = results[0].plot()
+                    picker.frame = cv2.cvtColor(picker.frame, cv2.COLOR_YCrCb2RGB)
                     picker.results = results
-                    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(results[0].plot()))
+                    picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
                     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
 
                     # if we're already navigating, don't interrupt
@@ -132,15 +136,17 @@ def update():
                         # user wants to get in - stop model
                         is_enter_manually_running = True
                         frame_copy = np.copy(picker.frame)
-                        open_button = tk.Button(root, text="Open Dialog", command=lambda: detected_dialog(frame_copy))
-                        # open_button.pack()
+                        open_button = tk.Button(root, text="show window capture", command=lambda: detected_dialog(frame_copy))
+                        # # open_button.pack()
                         open_button.grid(row=4, column=1)
 
-                        messagebox.showinfo("Model detection PAUSED",
-                                            "Model detection will now be paused.\n you can navigate manually. ")
+                        #info_message = tk.Label(root,
+                        #                       text="Model detection PAUSED\nModel detection will now be paused.\n you can navigate manually. ")
+                        #info_message.grid(row=5, column=1)  # Adjust row and column as needed
+
                         new_window = tk.Toplevel(root)
                         change_button = tk.Button(new_window, text="return to model", command=stop_manual_return_model)
-                        # change_button.pack()
+                        #change_button.pack()
                         change_button.grid(row=4, column=2)
 
                     else:
@@ -150,6 +156,9 @@ def update():
                 else:
                     picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
                     picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
+            else:
+                picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
+                picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
         else:
             picker.photo = ImageTk.PhotoImage(image=Image.fromarray(picker.frame))
             picker.canvas.itemconfig(picker.canvas_image, image=picker.photo)
@@ -165,7 +174,7 @@ def detected_dialog(current_plotted_frame):
     dialog_box.geometry = ("400x400")
 
     # Convert the OpenCV image (BGR) to a PIL image (RGB)
-    current_plotted_frame = cv2.cvtColor(current_plotted_frame, cv2.COLOR_BGR2Lab)
+    current_plotted_frame = cv2.cvtColor(current_plotted_frame, cv2.COLOR_BGR2RGB)
     image = Image.fromarray(current_plotted_frame)
 
     # Convert the PIL image to a PhotoImage, which Tkinter can display
@@ -174,23 +183,24 @@ def detected_dialog(current_plotted_frame):
     # Display the image
     image_label = tk.Label(dialog_box, image=photo)
     image_label.image = photo  # keep a reference to the image
-    image_label.pack()
+    image_label.grid(row=0, column=0)
 
     # Create a function to handle the user's button click
     def on_button_click():
         # If the user clicks the "Yes" button, do something
         # ...
         dialog_box.destroy()  # Close the dialog box
+        return
 
     # Create a "Yes" button using a Tkinter Button widget
     yes_button = up_button = tk.Button(dialog_box, activebackground="#d9d9d9", image=accept_img, borderwidth=0,
                                        command=on_button_click)
-    yes_button.pack(side="left", padx=10, pady=10)
+    yes_button.grid(row=1, column=1)
 
     # Create a "No" button using a Tkinter Button widget
     no_button = tk.Button(dialog_box, activebackground="#d9d9d9", image=reject_img, borderwidth=0,
                           command=dialog_box.destroy)
-    no_button.pack(side="right", padx=10, pady=10)
+    no_button.grid(row=1, column=2)
 
     # Run the Tkinter event loop to display the dialog box and wait for user input
     dialog_box.mainloop()
@@ -250,7 +260,7 @@ def engine():
 
 
 # create a Tello object to control the drone
-step = 20
+step = 35
 ON = False
 is_enter_manually_running = False
 print("     main-> starting Model")
