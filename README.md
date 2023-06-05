@@ -29,7 +29,8 @@ The application includes a graphical user interface (GUI) that provides an inter
 - Rotation Buttons: The GUI includes rotate clockwise and rotate counterclockwise buttons. These buttons allow the user to rotate the drone or camera perspective in the simulated environment.
 
 - Start Button: The GUI features a start button that initiates the window detection process. Once clicked, the algorithm will start analyzing the image and detecting windows.
- ![GUI example](drone.png)
+
+![GUI example](drone.png)
 
 - Popup Message: When a window is detected, a popup message will appear, allowing the user to choose whether to turn off the window detection model and navigate to the detected window or continue scanning for more windows.
 
