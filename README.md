@@ -22,13 +22,14 @@ This project aims to detect and enter windows in a building facade using compute
 
 The application includes a graphical user interface (GUI) that provides an interactive way to control the window detection and entering process. The GUI offers the following features:
 
-- Color Picker: The GUI includes a color picker tool that allows the user to specify the color of the building in the image. This feature helps improve the accuracy of window detection by considering the color information.
+- Color Picker: The GUI includes a color picker tool that allows the user to specify the color of the building in the image, simple click on a pixel in the captured frame to set the building color. This feature is considered as future work and is not currently utilized in the main application.
 
 - Navigation Buttons: The GUI provides directional buttons for navigation, including forward, backward, right, left, up, and down. These buttons enable the user to move the drone or camera perspective within the simulated environment.
 
 - Rotation Buttons: The GUI includes rotate clockwise and rotate counterclockwise buttons. These buttons allow the user to rotate the drone or camera perspective in the simulated environment.
 
 - Start Button: The GUI features a start button that initiates the window detection process. Once clicked, the algorithm will start analyzing the image and detecting windows.
+ ![GUI example](drone.png)
 
 - Popup Message: When a window is detected, a popup message will appear, allowing the user to choose whether to turn off the window detection model and navigate to the detected window or continue scanning for more windows.
 
